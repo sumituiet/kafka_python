@@ -1,6 +1,7 @@
 # Kafka python setup
 
 this repository is the step-by-step guide to set up Kafka and create consumers and producers with a FastAPI example.
+for more details please reffer to `https://kafka.apache.org/documentation/`
 
 ## Documentation
 
