@@ -2,3 +2,5 @@ __pycache__
 .venv
 .python-version
 .env
+yolov3-wider_16000.weights
+crowd
