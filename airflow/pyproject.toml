@@ -1,0 +1,12 @@
+[project]
+name = "airflow"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "dagster>=1.10.8",
+    "dagster-docker>=0.26.8",
+    "dagster-webserver>=1.10.8",
+    "pandas>=2.2.3",
+]
