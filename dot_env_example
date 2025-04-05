@@ -1,0 +1,36 @@
+# -----------------
+# Kafka
+# -----------------
+KAFKA_NODE_ID=1
+KAFKA_PROCESS_ROLES=broker,controller
+KAFKA_CONTROLLER_QUORUM_VOTERS=1@localhost:9093
+KAFKA_LISTENERS=PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093,INTERNAL://0.0.0.0:29092
+KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT
+KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092,INTERNAL://kafka:29092
+KAFKA_INTER_BROKER_LISTENER_NAME=INTERNAL
+KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER
+KAFKA_LOG_DIRS=/var/lib/kafka/data
+
+# -----------------
+# RabbitMQ
+# -----------------
+RABBITMQ_DEFAULT_USER=airflow
+RABBITMQ_DEFAULT_PASS=airflow
+
+# -----------------
+# Postgres (Airflow)
+# -----------------
+POSTGRES_USER=airflow
+POSTGRES_PASSWORD=airflow
+POSTGRES_DB=airflow
+
+# -----------------
+# Airflow
+# -----------------
+AIRFLOW__CORE__EXECUTOR=CeleryExecutor
+AIRFLOW__CORE__FERNET_KEY=YOUR_FERNET_KEY_HERE
+AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
+AIRFLOW__CELERY__BROKER_URL=amqp://airflow:airflow@rabbitmq:5672/
+AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://airflow:airflow@postgres/airflow
+AIRFLOW__WEBSERVER__DEFAULT_USER_USERNAME=admin
+AIRFLOW__WEBSERVER__DEFAULT_USER_PASSWORD=admin
