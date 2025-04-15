@@ -25,44 +25,41 @@
 - [Configuration Options](#configuration-options)
 
 ## API Reference
-- [Producer API]()
-- [Consumer API]()
-- [Admin API]()
-
+- [Producer API](#producer-api)
+- [Consumer API](#consumer-api)
 ## Advanced Usage
-- [Serialization and Deserialization]()
-- [Error Handling and Retry Mechanisms]()
-- [Performance Tuning]()
-- [Security Configuration]()
-- [Monitoring and Metrics]()
+- [Serialization and Deserialization](#serialization-and-deserialization)
+- [Error Handling and Retry Mechanisms](#error-handling-and-retry-mechanism)
+- [Performance Tuning](#performance-tuning)
+- [Monitoring and Metrics](#monitoring-and-metrics)
 ## Deployment
-- [Production Best Practices]()
-- [Scaling Considerations]()
-- [Containerization with Docker]()
-- [Cloud Deployment Options]()
+- [Production Best Practices](#production-best-practices)
+- [Scaling Considerations](#scaling-considerations)
+- [Containerization with Docker](#containerization-with-docker)
+- [Cloud Deployment Options](#cloud-deployment-options)
 
 ## Examples
-- [Basic Examples]()
--  [Real World Scenarios]()
--  [Integration with Other Systems]()
--  [Batch Processing]()
--  [Stream Processing]()
+- [Basic Examples](#basic-examples)
+-  [Real World Scenarios](#real-world-scenarios)
+-  [Integration with Other Systems](#integration-with-other-systems)
+-  [Batch Processing](#batch-processing)
+-  [Stream Processing](#stream-processing)
 
 ## Contributing
-- [Deveopment Setup]()
-- [Code Style Guidelines]()
-- [Testing]()
-- [Pull Request process]()
+- [Development Setup](#development-setup)
+- [Code Style Guidelines](#code-style-guidelines)
+- [Testing](#testing)
+- [Pull Request process](#pull-request-process)
 
 ## Troubleshooting
-- [Common Issues]()
-- [Debugging Tips]()
-- [FAQ]()
+- [Common Issues](#common-issues)
+- [Debugging Tips](#debugging-tips)
+- [FAQ](#faq)
 
 ## Appendix
-- [Glossary]()
-- [Additonal Resources]()
-- [Version History]()
+- [Glossary](#glossary)
+- [Additonal Resources](#additional-resources)
+- [Version History](#version-history)
 
 
 
@@ -655,6 +652,535 @@ consumer = KafkaConsumer(
 )
 ```
 These configurations allow you to fine-tune performance, reliability, and behavior of your Kafka applications.
+
+## API Reference
+###  Producer API
+
+**Module**: `producer.py`  
+**Functionality**:
+- Reads video frames using OpenCV.
+- Applies YOLOv3-based face detection.
+- Sends JSON results to the Kafka topic `Faces`.
+
+**Kafka Configuration**:
+```python
+KafkaProducer(
+    bootstrap_servers='localhost:9092',
+    value_serializer=lambda v: json.dumps(v).encode('utf-8')
+)
+```
+
+Topic: Faces
+Message Format:
+```json
+{
+  "frame_id": 12,
+  "total_faces": 3,
+  "faces": [
+    {
+      "face_id": 0,
+      "bounding_box": {"x": 100, "y": 120, "width": 50, "height": 50},
+      "confidence": 0.89
+    }
+  ]
+}
+
+```
+
+### Consumer API
+**Module**: `consumer.py`  
+Functionality:
+
+- Subscribes to Kafka topic Faces.
+
+- Deserializes JSON messages.
+
+- Persists face data to MongoDB using insert_face_data().
+
+```python
+KafkaConsumer(
+    'Faces',
+    bootstrap_servers='localhost:9092',
+    auto_offset_reset='earliest',
+    value_deserializer=lambda v: json.loads(v.decode('utf-8'))
+)
+```
+
+MongoDB Integration:
+
+- Assumes insert_face_data(data) in database.py.
+---
+##  Advanced Usage 
+
+###  Serialization and Deserialization
+
+- The **Producer** converts Python data (dictionary) to JSON before sending to Kafka.
+- The **Consumer** reads the JSON from Kafka and turns it back into a Python dictionary.
+
+```python
+# Producer
+value_serializer=lambda v: json.dumps(v).encode('utf-8')
+
+# Consumer
+value_deserializer=lambda v: json.loads(v.decode('utf-8'))
+```
+
+---
+
+###  Error Handling and Retry Mechanism
+
+- Right now, the app stops with `CTRL+C`.
+- In the future, we try to implement:
+  - **Retry logic**: Try sending or saving again if something fails.
+  - **Logging errors**: Print or save errors to understand what went wrong.
+
+---
+
+###  Performance Tuning
+
+- You can skip more frames by changing this line in `producer.py`:
+  ```python
+  frame_interval = int(fps / 3)
+  ```
+  Try `/2` or `/5` depending on how fast you want it.
+
+- Use **batch writes** for MongoDB to save many face results at once.
+- Kafka has settings like `linger.ms` and `batch.size` to send data faster and smarter.
+
+---
+##  Monitoring and Metrics
+
+Monitoring helps ensure your system is working correctly, and lets you catch problems early. Below are suggestions to monitor the health and performance of your Kafka pipeline.
+
+---
+
+###  Kafka Monitoring
+
+Use tools like:
+
+- **Kafka Manager** or **Confluent Control Center** – to monitor:
+  - Topic lag
+  - Message throughput
+  - Broker health
+- **Prometheus + Grafana** (with JMX Exporter) – for real-time dashboards
+
+**Metrics to track**:
+- `Messages In/Out per second`
+- `Under-replicated partitions`
+- `Consumer group lag`
+- `Producer retries/failures`
+
+---
+
+###  Producer Metrics
+
+If you want to log metrics from the `producer.py`, consider:
+
+- Logging each frame sent and face count:
+  ```python
+  print(f" Sent Frame {frame_id}: {result['total_faces']} faces")
+  ```
+Track dropped frames, retries, or exceptions using a logger.
+
+For more advanced tracking:
+
+- Use **prometheus_client** Python package to expose metrics from producer and consumer as HTTP endpoints.
+
+### Consumer Metrics
+**Monitor**:
+
+- Number of messages consumed
+
+- Insert success/failure count in MongoDB
+
+To add basic timing:
+```python
+import time
+start_time = time.time()
+insert_face_data(data)
+print(f"Insertion took {time.time() - start_time} seconds")
+```
+### MongoDB Monitoring
+**MongoDB** Monitoring
+Used  MongoDB Atlas or MongoDB Compass to:
+
+- Track query times
+
+- Monitor CPU/memory usage
+
+- Review indexing effectiveness
+
+  
+# Deployment Guide
+
+This guide provides step-by-step instructions to deploy the Kafka-based face detection system using Docker Compose.
+
+---
+
+## Production Best Practices
+
+### Recommendations
+- Use environment variables via `.env` for configuration.
+- Separate dev/staging/prod Docker files if needed.
+- Never commit actual secrets (e.g., passwords, keys) to version control.
+- Use logging, retry, and error handling in producer/consumer scripts.
+- Monitor Kafka, MongoDB, and Airflow health with dashboards or alerts.
+
+---
+
+### Scaling Considerations
+
+### Techniques
+- Use Kafka **partitions** to parallelize topic processing.
+- Add more **consumers** in a **consumer group** to scale reads.
+- Use multiple **Airflow Celery workers** for concurrent DAG execution.
+- Enable **MongoDB sharding** for handling large volumes of face detection data.
+- Control processing load using `frame_interval` in `producer.py`.
+
+---
+
+## Containerization with Docker
+
+###  Services Overview
+
+| Service       | Description                                 |
+|---------------|---------------------------------------------|
+| **Kafka**     | Message broker in KRaft mode                |
+| **Kafka UI**  | Web interface for Kafka monitoring          |
+| **RabbitMQ**  | Queue broker for Celery (Airflow)           |
+| **PostgreSQL**| Database for Airflow metadata               |
+| **Airflow**   | Task orchestration and scheduling platform  |
+| **MongoDB**   | NoSQL DB for face detection results         |
+
+###  How to Run
+1. Create a `.env` file (with placeholders if sharing):
+```env
+POSTGRES_USER=airflow
+POSTGRES_PASSWORD=airflow
+RABBITMQ_DEFAULT_USER=admin
+...
+```
+
+2. Start the stack:
+```bash
+docker compose up -d --build
+```
+
+3. Access services:
+- Kafka UI: http://localhost:8080
+- Airflow: http://localhost:8888
+- RabbitMQ: http://localhost:15672
+
+---
+
+## Cloud Deployment Options
+
+###  Recommended Services
+
+| Component   | Cloud Alternative                       |
+|-------------|------------------------------------------|
+| Kafka       | Confluent Cloud, AWS MSK                 |
+| MongoDB     | MongoDB Atlas                            |
+| Container Hosting | GCP Cloud Run, AWS ECS, Azure Container Apps |
+| Monitoring  | Grafana Cloud, Datadog, Prometheus Stack |
+
+>  Pro Tip: Use managed cloud services to reduce infrastructure overhead.
+
+---
+
+
+# Examples
+
+## Basic Examples
+
+###  Running the System Locally
+
+Start the producer and consumer from the command line:
+
+```bash
+python producer.py
+python consumer.py
+```
+
+Sample output:
+```bash
+ Sent Frame 21: 3 faces
+Received JSON:
+{
+  "frame_id": 21,
+  "total_faces": 3,
+  ...
+}
+```
+
+---
+
+## Real World Scenarios
+
+###  Use Cases
+
+- **Smart Surveillance**: Detect crowd levels in public areas using CCTV.
+- **Retail Analytics**: Monitor foot traffic and customer behavior in stores.
+- **Event Management**: Track audience density and movement during live events.
+- **Campus Monitoring**: Integrate with security feeds to detect unusual gatherings.
+
+---
+
+## Integration with Other Systems
+
+###  How to Extend
+
+- **REST APIs**: Send results to analytics dashboards or visualization tools.
+- **Database Sync**: Save face detection metadata to PostgreSQL for structured querying.
+- **IoT Integration**: Trigger edge devices (alarms, cameras) based on crowd thresholds.
+- **Cloud Logging**: Export structured logs to ELK stack or GCP Logging.
+
+---
+
+## Batch Processing
+
+###  How It Works
+
+- Use Airflow DAGs to:
+  - Periodically scan folders for `.mp4` files
+  - Trigger face detection
+  - Store results in MongoDB or export as CSV
+
+Example DAG task:
+```python
+run_producer = BashOperator(
+    task_id='process_video',
+    bash_command='python /opt/airflow/dags/producer.py'
+)
+```
+
+---
+
+## Stream Processing
+
+###  Real-Time Analytics
+
+- Connect the producer to a **live video source** (RTSP camera or webcam).
+- Use Kafka to stream frames with minimal latency.
+- Consumers process in near-real-time and store results in MongoDB.
+- Combine with Airflow for post-processing pipelines or alerts.
+
+---
+
+
+## Contributing Guide
+
+We welcome contributions to improve this Kafka-based face detection pipeline! Follow the guidelines below to ensure smooth collaboration.
+
+---
+
+#  Development Setup
+
+### Prerequisites
+- Python 3.10+
+- Docker & Docker Compose
+- Git
+
+### Setup Instructions
+1. Clone the repository:
+```bash
+git clone https://github.com/sumituiet/kafka_python/
+cd face-detection-kafka
+```
+
+2. Create a virtual environment:
+```bash
+python -m venv venv
+source venv/bin/activate  # or venv\Scripts\activate on Windows
+```
+
+3. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+4. Create a `.env` file using `.env.example` as a reference.
+
+5. Run services:
+```bash
+docker compose up -d --build
+```
+
+---
+
+##  Code Style Guidelines
+
+- Follow **PEP8** for Python code.
+- Use meaningful variable names and comments.
+- Use `black` or `autopep8` for formatting:
+```bash
+black .
+```
+
+- Follow consistent naming and indentation conventions.
+
+---
+
+##  Testing
+
+- Unit tests should go in the `tests/` folder.
+- Use `pytest` to run tests:
+```bash
+pytest tests/
+```
+
+- Each function/module should have at least one test case.
+
+---
+
+##  Pull Request Process
+
+1. Fork the repository.
+2. Create a new branch:
+```bash
+git checkout -b feature/your-feature-name
+```
+
+3. Make your changes and commit them:
+```bash
+git commit -m "Add: brief description of change"
+```
+
+4. Push to your fork:
+```bash
+git push origin feature/your-feature-name
+```
+
+5. Open a Pull Request:
+   - Include a **clear title and description**
+   - Mention any relevant issue numbers
+   - Request review if needed
+
+---
+
+## Thank You
+
+Thanks for helping improve the project! Your contributions make it better for everyone.
+
+
+#  Troubleshooting Guide
+
+This guide helps you resolve common issues and understand how to debug problems in the Kafka-based face detection system.
+
+---
+
+##  Common Issues
+
+### 1. Kafka Producer not connecting
+**Symptoms**: `NoBrokersAvailable` or connection timeout
+
+**Solutions**:
+- Ensure Kafka is running (`docker compose ps`)
+- Check that you're using the correct port (usually `9092` or `29092`)
+- Ensure environment variables in `.env` are correct
+
+---
+
+### 2. MongoDB insertion fails
+**Symptoms**: `Connection refused` or no data appears in MongoDB
+
+**Solutions**:
+- Check that MongoDB is running (`docker ps`)
+- Make sure `insert_face_data()` connects to the correct host and port
+- Use `mongo` CLI or Compass to verify connection
+
+---
+
+### 3. YOLO model file errors
+**Symptoms**: File not found errors for `yolov3-face.cfg` or `.weights`
+
+**Solutions**:
+- Ensure model files are placed in the correct working directory
+- Use absolute paths or validate the relative path is correct
+
+---
+
+### 4. Airflow web UI is blank or errors
+**Solutions**:
+- Check Airflow logs using `docker compose logs airflow`
+- Ensure `FERNET_KEY` is set and consistent across all services
+- Run `airflow db upgrade` and restart services
+
+---
+
+##  Debugging Tips
+
+- Use `print()` logs or structured logging (`logging`, `loguru`) in `producer.py` and `consumer.py`
+- Enable Prometheus metrics and visualize with Grafana
+- Use `docker logs <container>` to inspect container output
+- Temporarily reduce `frame_interval` to speed up testing
+
+---
+
+##  FAQ
+
+### Q: Can I run this without Docker?
+**A**: Yes, but you'll need to install Kafka, MongoDB, and dependencies manually.
+
+### Q: How do I connect to Kafka UI?
+**A**: Visit `http://localhost:8080` (Kafka UI should be running via Docker).
+
+### Q: What is the use of `frame_interval`?
+**A**: It controls how frequently frames are processed. Higher values = fewer frames.
+
+### Q: How do I add another consumer?
+**A**: Clone `consumer.py`, give it a unique group ID, and run it in parallel.
+
+### Q: How can I scale this in production?
+**A**: Use Kafka partitions, deploy with Kubernetes, use MongoDB Atlas, and monitor with Prometheus.
+
+---
+
+#  Appendix
+
+This section includes supporting materials such as definitions, external resources, and project version history.
+
+---
+
+##  Glossary
+
+| Term          | Description |
+|---------------|-------------|
+| **Kafka**     | A distributed event streaming platform used to handle real-time data feeds. |
+| **Producer**  | A service or program that publishes data to Kafka topics. |
+| **Consumer**  | A service or program that subscribes to Kafka topics to read and process messages. |
+| **YOLOv3**    | A real-time object detection algorithm used here for face detection. |
+| **Airflow**   | A platform to programmatically author, schedule, and monitor workflows. |
+| **MongoDB**   | A NoSQL database used for storing face detection results. |
+| **Docker**    | A platform for developing and running applications inside containers. |
+
+---
+
+##  Additional Resources
+
+- [Apache Kafka Documentation](https://kafka.apache.org/documentation/)
+- [YOLOv3 Paper](https://pjreddie.com/media/files/papers/YOLOv3.pdf)
+- [MongoDB Docs](https://www.mongodb.com/docs/)
+- [Docker Docs](https://docs.docker.com/)
+- [Apache Airflow Docs](https://airflow.apache.org/docs/)
+- [Prometheus Docs](https://prometheus.io/docs/introduction/overview/)
+
+---
+
+##  Version History
+
+| Version | Date       | Description                    |
+|---------|------------|--------------------------------|
+| 1.0     | 2024-04-15 | Initial release with Kafka + YOLOv3 + MongoDB integration |
+| 1.1     | 2024-04-18 | Docker Compose + Airflow integration |
+| 1.2     | 2024-04-22 | Prometheus metrics and monitoring added |
+| 1.3     | 2024-04-25 | Documentation and troubleshooting guide included |
+
+---
+
+
+
+
 
 
 
