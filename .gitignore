@@ -4,3 +4,9 @@ __pycache__
 .env
 yolov3-wider_16000.weights
 crowd
+airflow/logs/
+airflow/plugins
+data
+secrets
+shared
+kafka-data

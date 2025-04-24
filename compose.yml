@@ -20,7 +20,9 @@ services:
       - KAFKA_CONTROLLER_LISTENER_NAMES=${KAFKA_CONTROLLER_LISTENER_NAMES}
       - KAFKA_LOG_DIRS=${KAFKA_LOG_DIRS}
     volumes:
-      - kafka-data:/var/lib/kafka/data
+      - ./kafka-data/data:/var/lib/kafka/data
+      - ./kafka-data/secretes:/etc/kafka/secrets
+      - ./kafka-data/config:/mnt/shared/config
     restart: unless-stopped
 
   kafka-ui:
@@ -47,99 +49,32 @@ services:
     environment:
       - RABBITMQ_DEFAULT_USER=${RABBITMQ_DEFAULT_USER}
       - RABBITMQ_DEFAULT_PASS=${RABBITMQ_DEFAULT_PASS}
-    restart: unless-stopped
-
-  # -----------------
-  # Postgres (Airflow DB)
-  # -----------------
-  postgres:
-    image: postgres:15
-    container_name: postgres
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - ./kafka-data/rabbitmq:/var/lib/rabbitmq
     restart: unless-stopped
 
   # -----------------
-  # Airflow Webserver
+  # Airflow (Standalone)
   # -----------------
   airflow:
     image: apache/airflow:2.10.5
     container_name: airflow
-    depends_on:
-      - postgres
-      - rabbitmq
     ports:
       - "8888:8080"
     environment:
-      - AIRFLOW__CORE__EXECUTOR=${AIRFLOW__CORE__EXECUTOR}
-      - AIRFLOW__CORE__FERNET_KEY=${AIRFLOW__CORE__FERNET_KEY}
-      - AIRFLOW__CORE__SQL_ALCHEMY_CONN=${AIRFLOW__CORE__SQL_ALCHEMY_CONN}
-      - AIRFLOW__CELERY__BROKER_URL=${AIRFLOW__CELERY__BROKER_URL}
-      - AIRFLOW__CELERY__RESULT_BACKEND=${AIRFLOW__CELERY__RESULT_BACKEND}
-      - AIRFLOW__WEBSERVER__DEFAULT_USER_USERNAME=${AIRFLOW__WEBSERVER__DEFAULT_USER_USERNAME}
-      - AIRFLOW__WEBSERVER__DEFAULT_USER_PASSWORD=${AIRFLOW__WEBSERVER__DEFAULT_USER_PASSWORD}
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__CORE__FERNET_KEY=KEY
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN={DB_PATH}
+      - AIRFLOW__WEBSERVER__DEFAULT_USER_USERNAME=${AIRFLOW__WEBSERVER__DEFAULT_USER_USERNAME:-admin}
+      - AIRFLOW__WEBSERVER__DEFAULT_USER_PASSWORD=${AIRFLOW__WEBSERVER__DEFAULT_USER_PASSWORD:-admin}
     volumes:
-      - airflow-data:/opt/airflow
       - ./airflow/dags:/opt/airflow/dags
       - ./airflow/logs:/opt/airflow/logs
       - ./airflow/plugins:/opt/airflow/plugins
     command: >
       bash -c "
-      airflow db upgrade &&
-      airflow users create --username ${AIRFLOW__WEBSERVER__DEFAULT_USER_USERNAME} --password ${AIRFLOW__WEBSERVER__DEFAULT_USER_PASSWORD} --firstname Admin --lastname User --role Admin --email admin@example.com &&
-      airflow webserver
+      airflow db migrate &&
+      airflow users create --username \${AIRFLOW__WEBSERVER__DEFAULT_USER_USERNAME:-admin} --password \${AIRFLOW__WEBSERVER__DEFAULT_USER_PASSWORD:-admin} --firstname Admin --lastname User --role Admin --email admin@example.com &&
+      airflow webserver & airflow scheduler
       "
     restart: unless-stopped
-
-  # -----------------
-  # Airflow Scheduler
-  # -----------------
-  airflow-scheduler:
-    image: apache/airflow:2.10.5
-    container_name: airflow-scheduler
-    depends_on:
-      - airflow
-    environment:
-      - AIRFLOW__CORE__EXECUTOR=${AIRFLOW__CORE__EXECUTOR}
-      - AIRFLOW__CORE__FERNET_KEY=${AIRFLOW__CORE__FERNET_KEY}
-      - AIRFLOW__CORE__SQL_ALCHEMY_CONN=${AIRFLOW__CORE__SQL_ALCHEMY_CONN}
-      - AIRFLOW__CELERY__BROKER_URL=${AIRFLOW__CELERY__BROKER_URL}
-      - AIRFLOW__CELERY__RESULT_BACKEND=${AIRFLOW__CELERY__RESULT_BACKEND}
-    volumes:
-      - airflow-data:/opt/airflow
-      - ./airflow/dags:/opt/airflow/dags
-      - ./airflow/logs:/opt/airflow/logs
-      - ./airflow/plugins:/opt/airflow/plugins
-    command: airflow scheduler
-    restart: unless-stopped
-
-  # -----------------
-  # Airflow Celery Worker
-  # -----------------
-  airflow-worker:
-    image: apache/airflow:2.10.5
-    container_name: airflow-worker
-    depends_on:
-      - airflow
-    environment:
-      - AIRFLOW__CORE__EXECUTOR=${AIRFLOW__CORE__EXECUTOR}
-      - AIRFLOW__CORE__FERNET_KEY=${AIRFLOW__CORE__FERNET_KEY}
-      - AIRFLOW__CORE__SQL_ALCHEMY_CONN=${AIRFLOW__CORE__SQL_ALCHEMY_CONN}
-      - AIRFLOW__CELERY__BROKER_URL=${AIRFLOW__CELERY__BROKER_URL}
-      - AIRFLOW__CELERY__RESULT_BACKEND=${AIRFLOW__CELERY__RESULT_BACKEND}
-    volumes:
-      - airflow-data:/opt/airflow
-      - ./airflow/dags:/opt/airflow/dags
-      - ./airflow/logs:/opt/airflow/logs
-      - ./airflow/plugins:/opt/airflow/plugins
-    command: airflow celery worker
-    restart: unless-stopped
-
-volumes:
-  kafka-data:
-  airflow-data:
-  postgres-data:
