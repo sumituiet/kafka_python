@@ -65,7 +65,7 @@
 
 # Project Overview
 ## Kafka Python Backend for Crowd Monitoring
-The **Kafka Python Backend** is a critical component of the Crowd Monitoring system designed to process images and video frames for face detection using a messaging architecture. This backend infrastructure leverages Apache Kafka for efficient message handling, FastAPI for lightweight API endpoints, and YOLOv3 for accurate face detection in crowd monitoring applications.
+The **Kafka Python Backend** is a critical component of the Crowd Monitoring system designed to process images and video frames for face detection using a messaging architecture. This backend infrastructure leverages Apache Kafka for efficient message handling, FastAPI for lightweight API endpoints, and a modular face detection model for identifying faces in crowd monitoring applications.
 
 ## Purpose
 The main goals of this project are:
@@ -73,21 +73,19 @@ The main goals of this project are:
 2. Implement a producer-consumer architecture for distributed message processing
 3. Utilize Apache Kafka to handle high-throughput message streams efficiently 
 4. Provide REST API endpoints through FastAPI for system integration
-5. Apply YOLOv3 for accurate face detection in crowd analysis
+
 
 ## Architecture Overview
 This project implements a messaging-based architecture with:
 - **Kafka Message Broker**: Handles communication between components for crowd monitoring data
 - **FastAPI Service**: Provides REST API endpoints for sending and receiving detection results
-- **YOLOv3 Processing**: Performs face detection on crowd footage
-- **MongoDB Integration**: Stores face detection results for crowd analysis
 - **Background Processing**: Runs Kafka consumer in a separate thread for continuous operation
 
 ## Technical Components
 - **app.py**: FastAPI application with Kafka integration and REST endpoints
 - **model.py**: YOLOv3 face detection implementation with JSON result formatting
 - **producer.py**: Face detection code for producing messages to Kafka
-- **consumer.py**: Kafka consumer for processing face detection results and storing in MongoDB
+- **consumer.py**: Kafka consumer for processing face detection results and storing in PostgreSQL
 
 ## System Requirements
 - **Python**: 3.10 or higher
@@ -97,7 +95,8 @@ This project implements a messaging-based architecture with:
 - **Container Platform**: Docker & Docker Compose
 
 ## Setup & Deployment
-The system can be deployed using Docker Compose for simplified setup of the Kafka server and related services. A virtual environment is managed through the uv tool, with documentation available through FastAPI's built-in Swagger UI.
+The system is deployed on the Redback server, where Kafka, PostgreSQL, RabbitMQ, and Airflow are pre-configured and running.
+Local Python development is supported via a virtual environment using the uv tool. API documentation is accessible through the built-in Swagger UI when the FastAPI service is running.
 
 ---
 [Table of Contents](:/e603cea36b144275b9d1db73c2452e51) | [Next: Key Features](:/407760a71f504e3aa2270f122abacf6e)
@@ -110,7 +109,7 @@ This guide will help you quickly set up and run the Kafka Python Backend for you
 
 Before you begin, ensure you have the following installed:
 - Python 3.10 or higher
-- Docker and Docker Compose
+- (Optional) Docker, only if you plan to run services locally instead of using Redback
 - uv 0.6 or higher
 
 ## Installation Steps
@@ -121,10 +120,15 @@ Before you begin, ensure you have the following installed:
    cd kafka_python
    ```
 
-2. **Start Kafka and related services**
-    ```bash
-	docker-compose up -d
-    ```
+2. **Access hosted services (Redback)**
+   You can access the pre-configured services on the Deakin Redback server via:
+
+     Kafka UI: http://redback.it.deakin.edu.au:8080
+
+     RabbitMQ Management: http://redback.it.deakin.edu.au:15672
+
+     Airflow Web UI: http://redback.it.deakin.edu.au:8888
+
 3. **Create and activate a virtual environment using uv**
     ```bash
     uv venv
@@ -177,9 +181,11 @@ print(results)
 
  ## Monitoring 
 
-- Check your terminal for consumer output
-- MongoDB will store all processed face detection results
-- Use tools like Kafka UI (available at http://localhost:8080 if using the default Docker setup) to monitor Kafka topics
+- Check your terminal or logs for Kafka consumer output
+
+- PostgreSQL stores all processed face detection results — use tools like pgAdmin or psql CLI to inspect stored data
+
+- Use Kafka UI at http://redback.it.deakin.edu.au:8080 to monitor Kafka topics and message flow
 
 # Key Features
 The Kafka Python Backend with Face Detection offers specialized features designed for real-time face detection and messaging:
@@ -191,15 +197,6 @@ The Kafka Python Backend with Face Detection offers specialized features designe
 - In-memory message queue for temporary storage
 - Background thread consumer for continuous message processing
 - Efficient message handling with JSON serialization
-
-### YOLOv3 Face Detection
-- Advanced face detection using YOLOv3 neural network
-- Pre-trained model with optimized configuration
-- Model architecture defined in yolov3.cfg configuration file
-- Configurable confidence thresholds (default: 0.5)
-- Support for both static images and video frames
-- Detailed face location data with bounding boxes
-- Face confidence scoring for detection quality assessment
 
 ### FastAPI Integration
 - High-performance RESTful API endpoints
@@ -225,7 +222,7 @@ The Kafka Python Backend with Face Detection offers specialized features designe
 - Confidence scores for each detected face
 
 ### Data Persistence
-- MongoDB integration for storing face detection results
+- PostgreSQL integration for storing  results
 - Structured data format for efficient querying
 - Persistent storage of detection results
 
@@ -310,7 +307,8 @@ This document outlines the primary use cases for the Kafka Python Backend with Y
 
 # Installation
 
-This guide will walk you through the complete installation process for the Kafka Python Backend with YOLOv3 face detection.
+This guide will walk you through the complete installation process for the Kafka Python Backend with face detection support.
+
 
 ## Requirements
 
@@ -330,7 +328,7 @@ This guide will walk you through the complete installation process for the Kafka
 ### Network Requirements
 - Port 9092 available for Kafka broker
 - Port 8000 available for FastAPI service
-- Port 27017 available for MongoDB (if using the database)
+- Port 5432 open for PostgreSQL database (if accessing remotely)
 
 ## Setup Instructions
 
@@ -339,16 +337,16 @@ This guide will walk you through the complete installation process for the Kafka
 git clone https://github.com/sumituiet/kafka_python.git
 cd kafka_python
 ```
-### 2. Start Docker Services
-**Start Kafka, ZooKeeper, and MongoDB using Docker Compose:**
-```bash
-docker-compose up -d
-```
-### 3. Verify Services are running
-```bash
-docker-compose ps
-```
-### 4. Setup Python Environment
+### 2. **Access hosted services (Redback)**
+   You can access the pre-configured services on the Deakin Redback server via:
+
+     Kafka UI: http://redback.it.deakin.edu.au:8080
+
+     RabbitMQ Management: http://redback.it.deakin.edu.au:15672
+
+     Airflow Web UI: http://redback.it.deakin.edu.au:8888
+
+### 3. Setup Python Environment
 **Create and activate virtual environment using uv:**
 ```bash
 uv venv
@@ -380,18 +378,6 @@ TOPIC_NAME = "faces"
 In consumer.py (default)
 **Consumer topic for 'Faces'.**
 
-### 3.Configure YOLOv3 Parameters ###
-Ensure the following model files are placed in the appropriate directory (e.g., models/):
-
-- `yolov3-face.cfg – Defines the YOLOv3 model architecture`
-
-- `yolov3-wider_16000.weights – Pre-trained weights file for face detection`
-```bash
-# Default confidence threshold is 0.5
-# To modify, change function calls:
-results = detect_faces("image.jpg", confidence_threshold=0.4) 
- # More sensitive
- ```
 
 #  Troubleshooting Installation
 
@@ -437,22 +423,6 @@ results = detect_faces("image.jpg", confidence_threshold=0.4)
 
 ---
 
-##  YOLOv3 Model Issues
-
-- **Problem**: Model files not found  
-  **Solution**:  
-  - Make sure the following files are in the correct directory (same as `models.py` unless specified):
-    - `yolov3-face.cfg`
-    - `yolov3-wider_16000.weights`  
-  - Check for typos in filenames or paths in your code  
-  - Ensure file permissions allow reading
-
-- **Problem**: Out of memory during model loading  
-  **Solution**:  
-  - Close other memory-intensive applications  
-  - Consider using a machine with more available RAM or try on a cloud instance
-
----
 
 ##  Connectivity Issues
 
@@ -695,7 +665,7 @@ Functionality:
 
 - Deserializes JSON messages.
 
-- Persists face data to MongoDB using insert_face_data().
+- Persists face data to PostgreSQL using insert_face_data().
 
 ```python
 KafkaConsumer(
@@ -706,7 +676,7 @@ KafkaConsumer(
 )
 ```
 
-MongoDB Integration:
+PostgreSQL Integration:
 
 - Assumes insert_face_data(data) in database.py.
 ---
@@ -744,7 +714,7 @@ value_deserializer=lambda v: json.loads(v.decode('utf-8'))
   ```
   Try `/2` or `/5` depending on how fast you want it.
 
-- Use **batch writes** for MongoDB to save many face results at once.
+- Use **batch writes** for PostgreSQL to save many face results at once.
 - Kafka has settings like `linger.ms` and `batch.size` to send data faster and smarter.
 
 ---
@@ -791,7 +761,7 @@ For more advanced tracking:
 
 - Number of messages consumed
 
-- Insert success/failure count in MongoDB
+- Insert success/failure count in PostgreSQL
 
 To add basic timing:
 ```python
@@ -800,15 +770,15 @@ start_time = time.time()
 insert_face_data(data)
 print(f"Insertion took {time.time() - start_time} seconds")
 ```
-### MongoDB Monitoring
-**MongoDB** Monitoring
-Used  MongoDB Atlas or MongoDB Compass to:
 
-- Track query times
+### PostgreSQL Monitoring
+Used tools like pgAdmin, PostgreSQL Performance Dashboard, or command-line utilities (e.g., pg_stat_statements) to:
 
-- Monitor CPU/memory usage
+Track query execution times
 
-- Review indexing effectiveness
+Monitor CPU and memory usage
+
+Review indexing effectiveness and query plans
 
   
 # Deployment Guide
@@ -824,7 +794,7 @@ This guide provides step-by-step instructions to deploy the Kafka-based face det
 - Separate dev/staging/prod Docker files if needed.
 - Never commit actual secrets (e.g., passwords, keys) to version control.
 - Use logging, retry, and error handling in producer/consumer scripts.
-- Monitor Kafka, MongoDB, and Airflow health with dashboards or alerts.
+- Monitor Kafka, PostgreSQL, and Airflow health with dashboards or alerts.
 
 ---
 
@@ -834,7 +804,7 @@ This guide provides step-by-step instructions to deploy the Kafka-based face det
 - Use Kafka **partitions** to parallelize topic processing.
 - Add more **consumers** in a **consumer group** to scale reads.
 - Use multiple **Airflow Celery workers** for concurrent DAG execution.
-- Enable **MongoDB sharding** for handling large volumes of face detection data.
+- Enable **PostgreSQL partitioning or table sharding** for handling large volumes of face detection data.
 - Control processing load using `frame_interval` in `producer.py`.
 
 ---
@@ -850,7 +820,7 @@ This guide provides step-by-step instructions to deploy the Kafka-based face det
 | **RabbitMQ**  | Queue broker for Celery (Airflow)           |
 | **PostgreSQL**| Database for Airflow metadata               |
 | **Airflow**   | Task orchestration and scheduling platform  |
-| **MongoDB**   | NoSQL DB for face detection results         |
+
 
 ###  How to Run
 1. Create a `.env` file (with placeholders if sharing):
@@ -861,15 +831,14 @@ RABBITMQ_DEFAULT_USER=admin
 ...
 ```
 
-2. Start the stack:
-```bash
-docker compose up -d --build
-```
+2. Skip Docker Compose – services are pre-deployed on Redback
+
+All backend services are already running on the Deakin Redback server.
 
 3. Access services:
-- Kafka UI: http://localhost:8080
-- Airflow: http://localhost:8888
-- RabbitMQ: http://localhost:15672
+- Kafka UI: http://redback.it.deakin.edu.au:8080
+- Airflow: http://redback.it.deakin.edu.au:8888
+- RabbitMQ: http://redback.it.deakin.edu.au:15672
 
 ---
 
@@ -880,7 +849,7 @@ docker compose up -d --build
 | Component   | Cloud Alternative                       |
 |-------------|------------------------------------------|
 | Kafka       | Confluent Cloud, AWS MSK                 |
-| MongoDB     | MongoDB Atlas                            |
+| PostgreSQL    |     Amazon RDS for PostgreSQL, Google Cloud SQL, Supabase                   
 | Container Hosting | GCP Cloud Run, AWS ECS, Azure Container Apps |
 | Monitoring  | Grafana Cloud, Datadog, Prometheus Stack |
 
@@ -944,7 +913,7 @@ Received JSON:
 - Use Airflow DAGs to:
   - Periodically scan folders for `.mp4` files
   - Trigger face detection
-  - Store results in MongoDB or export as CSV
+  - Store results in PostgreSQL  or export as CSV
 
 Example DAG task:
 ```python
@@ -962,7 +931,7 @@ run_producer = BashOperator(
 
 - Connect the producer to a **live video source** (RTSP camera or webcam).
 - Use Kafka to stream frames with minimal latency.
-- Consumers process in near-real-time and store results in MongoDB.
+- Consumers process in near-real-time and store results in PostgreSQL.
 - Combine with Airflow for post-processing pipelines or alerts.
 
 ---
@@ -1081,26 +1050,24 @@ This guide helps you resolve common issues and understand how to debug problems 
 
 ---
 
-### 2. MongoDB insertion fails
-**Symptoms**: `Connection refused` or no data appears in MongoDB
+### 2.PostgreSQL insertion fails
+**Symptoms**: Connection refused, timeout, or no data appears in PostgreSQL
 
 **Solutions**:
-- Check that MongoDB is running (`docker ps`)
-- Make sure `insert_face_data()` connects to the correct host and port
-- Use `mongo` CLI or Compass to verify connection
+
+- Ensure PostgreSQL service is running (check with systemctl status postgresql or using Redback monitoring tools)
+
+- Verify that insert_face_data() (or your database utility function) connects to the correct host, port, username, password, and database name
+
+- Use psql CLI or pgAdmin to manually connect and verify if data is being inserted:
+
+```bash
+psql -h <host> -U <user> -d <database>
+```
 
 ---
 
-### 3. YOLO model file errors
-**Symptoms**: File not found errors for `yolov3-face.cfg` or `.weights`
-
-**Solutions**:
-- Ensure model files are placed in the correct working directory
-- Use absolute paths or validate the relative path is correct
-
----
-
-### 4. Airflow web UI is blank or errors
+### 3. Airflow web UI is blank or errors
 **Solutions**:
 - Check Airflow logs using `docker compose logs airflow`
 - Ensure `FERNET_KEY` is set and consistent across all services
@@ -1120,10 +1087,17 @@ This guide helps you resolve common issues and understand how to debug problems 
 ##  FAQ
 
 ### Q: Can I run this without Docker?
-**A**: Yes, but you'll need to install Kafka, MongoDB, and dependencies manually.
+**A**: Yes, but it's not recommended unless necessary. Since all services (Kafka, PostgreSQL, RabbitMQ, Airflow) are already hosted on the Redback server, you only need to:
 
+- Set up a local Python environment (uv venv recommended)
+
+-Ensure your scripts connect to the Redback-hosted service URLs and ports
+
+- Manually install Python dependencies (e.g., kafka-python, psycopg2, requests, etc.)
 ### Q: How do I connect to Kafka UI?
-**A**: Visit `http://localhost:8080` (Kafka UI should be running via Docker).
+**A**: Visit `http://redback.it.deakin.edu.au:8080 `— Kafka UI is hosted and running on the Redback server.
+
+ If you're running it locally instead, the URL would be http://localhost:8080.
 
 ### Q: What is the use of `frame_interval`?
 **A**: It controls how frequently frames are processed. Higher values = fewer frames.
@@ -1132,7 +1106,14 @@ This guide helps you resolve common issues and understand how to debug problems 
 **A**: Clone `consumer.py`, give it a unique group ID, and run it in parallel.
 
 ### Q: How can I scale this in production?
-**A**: Use Kafka partitions, deploy with Kubernetes, use MongoDB Atlas, and monitor with Prometheus.
+**A**: 
+- Use Kafka partitions to parallelize message processing
+
+- Deploy microservices with Kubernetes or Cloud Run
+
+- Use a managed PostgreSQL service like Amazon RDS, Google Cloud SQL, or Supabase
+
+- Monitor performance using Prometheus, Grafana, or Datadog
 
 ---
 
@@ -1149,9 +1130,8 @@ This section includes supporting materials such as definitions, external resourc
 | **Kafka**     | A distributed event streaming platform used to handle real-time data feeds. |
 | **Producer**  | A service or program that publishes data to Kafka topics. |
 | **Consumer**  | A service or program that subscribes to Kafka topics to read and process messages. |
-| **YOLOv3**    | A real-time object detection algorithm used here for face detection. |
 | **Airflow**   | A platform to programmatically author, schedule, and monitor workflows. |
-| **MongoDB**   | A NoSQL database used for storing face detection results. |
+| **PostgreSQL** | A relational SQL database used for storing face detection results. |
 | **Docker**    | A platform for developing and running applications inside containers. |
 
 ---
@@ -1160,7 +1140,7 @@ This section includes supporting materials such as definitions, external resourc
 
 - [Apache Kafka Documentation](https://kafka.apache.org/documentation/)
 - [YOLOv3 Paper](https://pjreddie.com/media/files/papers/YOLOv3.pdf)
-- [MongoDB Docs](https://www.mongodb.com/docs/)
+- [PostgreSQL Docs](https://www.postgresql.org/docs/)
 - [Docker Docs](https://docs.docker.com/)
 - [Apache Airflow Docs](https://airflow.apache.org/docs/)
 - [Prometheus Docs](https://prometheus.io/docs/introduction/overview/)
@@ -1175,6 +1155,9 @@ This section includes supporting materials such as definitions, external resourc
 | 1.1     | 2024-04-18 | Docker Compose + Airflow integration |
 | 1.2     | 2024-04-22 | Prometheus metrics and monitoring added |
 | 1.3     | 2024-04-25 | Documentation and troubleshooting guide included |
+| 1.4     | 2025-04-22 |Replaced MongoDB with PostgreSQL for result storage|
+| 1.5     | 2025-04-25 |Migrated services to Deakin Redback server, removed local Docker|
+
 
 ---
 
